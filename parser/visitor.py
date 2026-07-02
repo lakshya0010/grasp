@@ -1,5 +1,23 @@
 import ast
 
+
+def collect_imports(tree):
+    imports = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for alias in node.names:
+                name = alias.asname if alias.asname else alias.name
+                imports[name] = module
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.asname if alias.asname else alias.name
+                imports[name] = alias.name
+            
+    return imports
+
+
+
 def get_dotted_chain(node):
     parts = []
     while isinstance(node, ast.Attribute):
@@ -24,11 +42,13 @@ def collect_defined_names(tree):
     return names
     
 class CallGraphVisitor(ast.NodeVisitor):
-    def __init__(self, locally_defined_names):
+    def __init__(self, locally_defined_names: set, imports:dict, repo_modules: set):
         self.current_class = None
         self.current_function = None
         self.local_symbols = {}
         self.locally_defined_names = locally_defined_names
+        self.imports = imports
+        self.repo_modules = repo_modules
         self.edges = []
 
     def _is_external(self, dotted_name):
@@ -41,6 +61,13 @@ class CallGraphVisitor(ast.NodeVisitor):
             return False
         if first_segment in self.local_symbols:
             return self.local_symbols[first_segment]
+        if first_segment in self.imports:
+            source_module = self.imports[first_segment]
+            return not any(
+                mod == source_module or mod.startswith(source_module + ".")
+                for mod in self.repo_modules
+            )
+            
         return True
     
 
@@ -91,11 +118,4 @@ class CallGraphVisitor(ast.NodeVisitor):
 
 
     
-with open(r"C:\Users\laksh\OneDrive\Desktop\Programs\Python\insightforge\app\repositories\statement_repo.py") as f:
-    source = f.read()
-tree = ast.parse(source)
-defined_names = collect_defined_names(tree)
-visitor = CallGraphVisitor(defined_names)
-visitor.visit(tree)
-for edge in visitor.edges:
-    print(edge)
+
