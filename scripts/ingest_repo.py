@@ -38,13 +38,18 @@ def ingest(repo_path):
         caller_id = node_id_map[(caller_name, file_path)]
         callee_id = node_id_map[(callee, None)]
 
-        edge_row = Edge(
+        existing_edge = session.query(Edge).filter_by(
             caller_id=caller_id,
-            callee_id=callee_id,
-            resolved=resolved,
-            is_external=is_external,
-        )
-        session.add(edge_row)
+            callee_id=callee_id
+        ).first()
+        if not existing_edge:
+            edge_row = Edge(
+                caller_id=caller_id,
+                callee_id=callee_id,
+                resolved=resolved,
+                is_external=is_external,
+            )
+            session.add(edge_row)
 
     session.commit()
     session.close()
