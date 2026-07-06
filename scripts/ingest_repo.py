@@ -1,15 +1,22 @@
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
-from db.models import Node, Edge
+from db.models import Node, Edge, Repository
 from db.session import SessionLocal
 from parser.walker import walk_repo
+from sqlalchemy.dialects.postgresql import insert
 
-
-def ingest(repo_path):
+def ingest(repo_path:str, repo_name:str, repo_url:str):
     edges = walk_repo(repo_path)
 
     session = SessionLocal()
+
+    repo = Repository(name=repo_name, url=repo_url)
+    session.add(repo)
+    session.flush()
+    repo_id = repo.id
+
+
     unique_nodes = {}
     for edge in edges:
         caller_full, callee, resolved, is_external = edge
@@ -26,7 +33,7 @@ def ingest(repo_path):
         if existing:
             node_id_map[(name, file_path)] = existing.id
         else:
-            node = Node(name=name, file_path=file_path, is_external=is_external)
+            node = Node(name=name, file_path=file_path, is_external=is_external, repo_id=repo_id)
             session.add(node)
             session.flush()
             node_id_map[(name, file_path)] = node.id
@@ -34,29 +41,28 @@ def ingest(repo_path):
     for edge in edges:
         caller_full, callee, resolved, is_external = edge
         file_path, caller_name = caller_full.split(":", maxsplit=1)
-
         caller_id = node_id_map[(caller_name, file_path)]
         callee_id = node_id_map[(callee, None)]
 
-        existing_edge = session.query(Edge).filter_by(
+        stmt = insert(Edge).values(
             caller_id=caller_id,
-            callee_id=callee_id
-        ).first()
-        if not existing_edge:
-            edge_row = Edge(
-                caller_id=caller_id,
-                callee_id=callee_id,
-                resolved=resolved,
-                is_external=is_external,
-            )
-            session.add(edge_row)
+            callee_id=callee_id,
+            resolved=resolved,
+            is_external=is_external,
+            repo_id=repo_id
+        ).on_conflict_do_nothing()
+        session.execute(stmt)
 
     session.commit()
     session.close()
     print(f"Done — {len(unique_nodes)} nodes, {len(edges)} edges ingested.")
 
+from parser.walker import walk_repo
+edges = walk_repo(r"C:\Users\laksh\OneDrive\Desktop\Programs\Python\insightforge\app")
+print(len(edges))
+
 if __name__ == "__main__":
-    ingest(sys.argv[1])
+    ingest(sys.argv[1], sys.argv[2], sys.argv[3])
 
 
 

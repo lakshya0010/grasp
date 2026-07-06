@@ -30,7 +30,11 @@ def walk_repo(repo_path: str):
         if any(part in skip for part in file_path.parts):
             continue
         source = file_path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as e:
+            print(f"Skipping {file_path}: {e}")
+            continue
         defined_names = collect_defined_names(tree)
         imports = collect_imports(tree)
         visitor = CallGraphVisitor(defined_names, imports, repo_modules)
