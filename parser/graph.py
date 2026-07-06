@@ -31,6 +31,7 @@ def get_descendants(G: nx.DiGraph, node_key: int, hops: int = 3) -> nx.DiGraph:
     return nx.ego_graph(G, node_key, radius=hops, undirected=False)
 
 def get_ancestors(G: nx.DiGraph, node_key: int, hops: int = 3) -> nx.DiGraph:
-    return nx.ego_graph(G.reverse(), node_key, radius=hops, undirected=False)
+    sub = nx.ego_graph(G.reverse(), node_key, radius=hops, undirected=False)
+    return sub.reverse()
     
 

@@ -5,14 +5,98 @@ sys.path.append(str(Path(__file__).parent.parent))
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import networkx as nx
+from typing import Optional
 
+from app.reasoning import ask_llm
 from db.session import SessionLocal
-from db.models import Node
-from parser.graph import load_graph_from_db, get_ancestors, get_descendants
+from db.models import Node,Repository
+from parser.graph import load_graph_from_db, get_ancestors, get_descendants, graph_cache, get_graph
+from scripts.ingest_repo import ingest
+
 
 app = FastAPI()
 
-G = load_graph_from_db()
+class IngestRequest(BaseModel):
+    repo_path: Optional[str] = None
+    repo_name: str
+    repo_url: Optional[str] = None
+
+class QueryRequest(BaseModel):
+    repo_id: int
+    node_name: str
+    question: str
+    hops: int = 3
 
 
+@app.post("/ingest")
+def ingest_repo(request: IngestRequest):
+    if not request.repo_path and not request.repo_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either path or the url"
+        )
+    if not request.repo_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Not yet supported"
+        )
+    
+    url = request.repo_url or request.repo_path
+    ingest(request.repo_path, request.repo_name, url)
+
+    session = SessionLocal()
+    repo = session.query(Repository).filter_by(name=request.repo_name).first()
+    session.close()
+    if repo and repo.id in graph_cache:
+        del graph_cache[repo.id]
+    
+    return{"status": "ingested", "repo": request.repo_name}
+
+
+@app.post("/query")
+def query(request: QueryRequest):
+    session = SessionLocal()
+    node = session.query(Node).filter_by(name = request.node_name, repo_id = request.repo_id).first()
+    session.close()
+
+    if not node:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No node {request.node_name} found in {request.repo_id}"
+        )
+    
+    G = get_graph(repo_id=request.repo_id)
+
+    descendants = get_descendants(G, node.id, hops=request.hops)
+    ancestors = get_ancestors(G, node.id, hops=request.hops)
+    combined = nx.compose(descendants, ancestors)
+
+    nodes_data = [
+        {
+            "id":n,
+            "name": combined.nodes[n]["name"],
+            "file_path": combined.nodes[n]["file_path"],
+            "is_external": combined.nodes[n]["is_external"],
+        } 
+        for n in combined.nodes
+
+    ]
+    edges_data = [
+        {
+            "caller":combined.nodes[u]["name"],
+            "callee":combined.nodes[v]["name"],
+            "resolved":combined.edges[u,v]["resolved"],
+            "is_external": combined.edges[u,v]["is_external"],
+        }
+        for u,v in combined.edges
+    ]
+    subgraph_data = {"nodes": nodes_data, "edges": edges_data}
+    answer = ask_llm(request.node_name, request.question, subgraph_data)
+
+    return{
+        "node": request.node_name,
+        "question": request.question,
+        "answer": answer,
+        "subgraph": subgraph_data
+    }
 
