@@ -6,7 +6,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import networkx as nx
 from typing import Optional
+import shutil
 
+from parser.clone import clone_repo
 from app.reasoning import ask_llm
 from db.session import SessionLocal
 from db.models import Node,Repository
@@ -31,18 +33,22 @@ class QueryRequest(BaseModel):
 @app.post("/ingest")
 def ingest_repo(request: IngestRequest):
     if not request.repo_path and not request.repo_url:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either path or the url"
-        )
-    if not request.repo_path:
-        raise HTTPException(
-            status_code=400,
-            detail="Not yet supported"
-        )
-    
-    url = request.repo_url or request.repo_path
-    ingest(request.repo_path, request.repo_name, url)
+        raise HTTPException(status_code=400, detail="Provide either repo_path or repo_url")
+
+    cloned_temp_dir = None
+    try:
+        if request.repo_path:
+            path_to_ingest = request.repo_path
+        else:
+            cloned_temp_dir = clone_repo(request.repo_url)
+            path_to_ingest = cloned_temp_dir
+
+        url = request.repo_url or request.repo_path
+        ingest(path_to_ingest, request.repo_name, url)
+
+    finally:
+        if cloned_temp_dir:
+            shutil.rmtree(cloned_temp_dir, ignore_errors=True)
 
     session = SessionLocal()
     repo = session.query(Repository).filter_by(name=request.repo_name).first()

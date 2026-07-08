@@ -11,10 +11,18 @@ def ingest(repo_path:str, repo_name:str, repo_url:str):
 
     session = SessionLocal()
 
-    repo = Repository(name=repo_name, url=repo_url)
-    session.add(repo)
-    session.flush()
-    repo_id = repo.id
+    existing_repo = session.query(Repository).filter_by(url=repo_url).first()
+    if existing_repo:
+        repo_id = existing_repo.id
+        existing_repo.name = repo_name  # allow name updates on refresh
+        session.query(Edge).filter_by(repo_id=repo_id).delete()
+        session.query(Node).filter_by(repo_id=repo_id).delete()
+        session.commit()
+    else:
+        repo = Repository(name=repo_name, url=repo_url)
+        session.add(repo)
+        session.flush()
+        repo_id = repo.id
 
 
     unique_nodes = {}
