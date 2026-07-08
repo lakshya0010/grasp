@@ -62,14 +62,17 @@ def ingest_repo(request: IngestRequest):
 @app.post("/query")
 def query(request: QueryRequest):
     session = SessionLocal()
-    node = session.query(Node).filter_by(name = request.node_name, repo_id = request.repo_id).first()
-    session.close()
+    node = session.query(Node).filter_by(
+    name=request.node_name,
+    repo_id=request.repo_id
+    ).filter(Node.file_path.isnot(None)).first()
 
     if not node:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No node {request.node_name} found in {request.repo_id}"
-        )
+        # fallback: no defined node with this name, use whatever exists (external/call-site only)
+        node = session.query(Node).filter_by(
+            name=request.node_name,
+            repo_id=request.repo_id
+        ).first()
     
     G = get_graph(repo_id=request.repo_id)
 

@@ -29,8 +29,8 @@ class Edge(Base):
     __tablename__="edges"
     id = Column(Integer, primary_key=True, autoincrement=True)
     repo_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
-    caller_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    callee_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
+    caller_id = Column(Integer, ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False)
+    callee_id = Column(Integer, ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False)
     resolved = Column(Boolean, default=True)
     is_external = Column(Boolean, default=False)
     __table_args__ = (UniqueConstraint("caller_id", "callee_id", "repo_id"),)
