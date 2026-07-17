@@ -100,6 +100,8 @@ def query(request: QueryRequest):
     ]
     edges_data = [
         {
+            "caller_id": u,
+            "callee_id": v,
             "caller":combined.nodes[u]["name"],
             "callee":combined.nodes[v]["name"],
             "resolved":combined.edges[u,v]["resolved"],

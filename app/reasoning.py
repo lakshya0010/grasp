@@ -41,6 +41,6 @@ Answer using only the structural information above. Be concise and specific.
 If the information above doesn't fully answer the question, say what's missing rather than guessing.
 """
     
-    llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", temperature=0)
     response = llm.invoke(prompt)
     return response.content[0]["text"]
