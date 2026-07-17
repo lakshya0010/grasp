@@ -14,9 +14,17 @@ from db.session import SessionLocal
 from db.models import Node,Repository
 from parser.graph import load_graph_from_db, get_ancestors, get_descendants, graph_cache, get_graph
 from scripts.ingest_repo import ingest
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class IngestRequest(BaseModel):
     repo_path: Optional[str] = None
