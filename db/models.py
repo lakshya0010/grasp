@@ -18,7 +18,7 @@ class Repository(Base):
 class Node(Base):
     __tablename__="nodes"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    repo_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repo_id = Column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     file_path = Column(String, nullable=True)
     is_external = Column(Boolean, default=False)
@@ -28,7 +28,7 @@ class Node(Base):
 class Edge(Base):
     __tablename__="edges"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    repo_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
+    repo_id = Column(Integer, ForeignKey("repositories.id", ondelete="CASCADE"), nullable=False)
     caller_id = Column(Integer, ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False)
     callee_id = Column(Integer, ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False)
     resolved = Column(Boolean, default=True)

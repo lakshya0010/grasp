@@ -37,6 +37,25 @@ class QueryRequest(BaseModel):
     question: str
     hops: int = 3
 
+@app.get("/repositories")
+def list_repositories():
+    session = SessionLocal()
+    repos = session.query(Repository).all()
+    result = [{"id":r.id, "name": r.name, "url": r.url} for r in repos]
+    session.close()
+    return result
+
+@app.get("/repositories/lookup")
+def lookup_repository(query: str):
+    query = query.strip()
+    session = SessionLocal()
+    repo = session.query(Repository).filter(
+        (Repository.name == query) | (Repository.url == query)
+    ).first()
+    session.close()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    return {"id": repo.id, "name": repo.name, "url": repo.url}
 
 @app.post("/ingest")
 def ingest_repo(request: IngestRequest):
@@ -66,6 +85,34 @@ def ingest_repo(request: IngestRequest):
     
     return{"status": "ingested", "repo": request.repo_name}
 
+
+@app.get("/graph/{repo_id}")
+def get_full_graph(repo_id:int):
+    G = get_graph(repo_id=repo_id)
+    nodes_data = [
+        {
+            "id": n,
+            "name": G.nodes[n]["name"],
+            "file_path": G.nodes[n]["file_path"],
+            "is_external": G.nodes[n]["is_external"]
+        }
+        for n in G.nodes
+    ]
+    edges_data = [
+        {
+            "caller_id": u,
+            "callee_id": v,
+            "caller": G.nodes[u]["name"],
+            "callee": G.nodes[v]["name"],
+            "resolved":G.edges[u,v]["resolved"],
+            "is_external": G.edges[u,v]["is_external"],
+        } for u,v in G.edges
+    ]
+    graph_data = {"nodes": nodes_data, "edges": edges_data}
+    return{
+        "repo_id": repo_id,
+        "graph_data": graph_data
+    }
 
 @app.post("/query")
 def query(request: QueryRequest):
