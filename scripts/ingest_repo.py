@@ -36,7 +36,7 @@ def ingest(repo_path:str, repo_name:str, repo_url:str):
     node_id_map = {}
     for(name, file_path, is_external) in unique_nodes:
         existing = session.query(Node).filter_by(
-            name=name, file_path=file_path
+            name=name, file_path=file_path, repo_id= repo_id
         ).first()
         if existing:
             node_id_map[(name, file_path)] = existing.id

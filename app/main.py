@@ -83,7 +83,7 @@ def ingest_repo(request: IngestRequest):
     if repo and repo.id in graph_cache:
         del graph_cache[repo.id]
     
-    return{"status": "ingested", "repo": request.repo_name}
+    return{"status": "ingested", "repo": request.repo_name, "id": repo.id}
 
 
 @app.get("/graph/{repo_id}")
@@ -128,6 +128,11 @@ def query(request: QueryRequest):
             name=request.node_name,
             repo_id=request.repo_id
         ).first()
+    if not node:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Node '{request.node_name}' not found in repo {request.repo_id}"
+        )
     
     G = get_graph(repo_id=request.repo_id)
 
