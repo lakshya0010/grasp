@@ -22,7 +22,7 @@ class Node(Base):
     name = Column(String, nullable=False)
     file_path = Column(String, nullable=True)
     is_external = Column(Boolean, default=False)
-    __table_args__ = (UniqueConstraint("name","file_path"),)
+    __table_args__ = (UniqueConstraint("name","file_path","repo_id"),)
 
 
 class Edge(Base):
