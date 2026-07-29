@@ -21,7 +21,12 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173, 'https://grasp-afo3.onrender.com"],
+    allow_origins=[
+        "http://localhost:5174",
+        "https://grasp-afo3.onrender.com",
+        "https://grasp-frontend-lyart.vercel.app",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -71,19 +76,26 @@ def ingest_repo(request: IngestRequest):
             path_to_ingest = cloned_temp_dir
 
         url = request.repo_url or request.repo_path
-        ingest(path_to_ingest, request.repo_name, url)
+        try:
+            ingest(path_to_ingest, request.repo_name, url)
+        except Exception as e:
+            # ensure any temp clone is cleaned up, then surface a clear error
+            raise HTTPException(status_code=500, detail=f"Ingest failed: {e}")
 
     finally:
         if cloned_temp_dir:
             shutil.rmtree(cloned_temp_dir, ignore_errors=True)
 
     session = SessionLocal()
-    repo = session.query(Repository).filter_by(name=request.repo_name).first()
-    session.close()
-    if repo and repo.id in graph_cache:
-        del graph_cache[repo.id]
-    
-    return{"status": "ingested", "repo": request.repo_name, "id": repo.id}
+    try:
+        repo = session.query(Repository).filter_by(name=request.repo_name).first()
+        if not repo:
+            raise HTTPException(status_code=500, detail="Repository not found after ingest; ingestion may have failed")
+        if repo.id in graph_cache:
+            del graph_cache[repo.id]
+        return {"status": "ingested", "repo": request.repo_name, "id": repo.id}
+    finally:
+        session.close()
 
 
 @app.get("/graph/{repo_id}")

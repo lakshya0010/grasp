@@ -5,6 +5,7 @@ from db.models import Node, Edge, Repository
 from db.session import SessionLocal
 from parser.walker import walk_repo
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 
 
 def merge_fragment_nodes(session, repo_id: int):
@@ -84,17 +85,33 @@ def ingest(repo_path:str, repo_name:str, repo_url:str):
         unique_nodes[(callee, None, is_external)] = None
 
     node_id_map = {}
-    for(name, file_path, is_external) in unique_nodes:
-        existing = session.query(Node).filter_by(
-            name=name, file_path=file_path, repo_id= repo_id
-        ).first()
-        if existing:
-            node_id_map[(name, file_path)] = existing.id
+    # Insert nodes using INSERT ... ON CONFLICT DO NOTHING RETURNING id
+    for (name, file_path, is_external) in unique_nodes:
+        stmt = insert(Node).values(
+            name=name,
+            file_path=file_path,
+            is_external=is_external,
+            repo_id=repo_id,
+        ).on_conflict_do_nothing().returning(Node.id)
+        res = session.execute(stmt)
+        row = res.fetchone()
+        if row and row[0]:
+            node_id_map[(name, file_path)] = row[0]
         else:
-            node = Node(name=name, file_path=file_path, is_external=is_external, repo_id=repo_id)
-            session.add(node)
-            session.flush()
-            node_id_map[(name, file_path)] = node.id
+            existing = session.query(Node).filter_by(
+                name=name, file_path=file_path, repo_id=repo_id
+            ).first()
+            if existing:
+                node_id_map[(name, file_path)] = existing.id
+            else:
+                # As a fallback, create the node and commit so subsequent edges can reference it
+                node = Node(name=name, file_path=file_path, is_external=is_external, repo_id=repo_id)
+                session.add(node)
+                session.flush()
+                node_id_map[(name, file_path)] = node.id
+
+    # Persist nodes before inserting edges to satisfy foreign key constraints
+    session.commit()
 
     for edge in edges:
         caller_full, callee, resolved, is_external = edge
