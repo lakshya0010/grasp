@@ -23,7 +23,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "grasp-frontend-g7g13wbyf-lakshya0010s-projects.vercel.app",
+        "grasp-frontend-eight.vercel.app",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
