@@ -43,4 +43,15 @@ If the information above doesn't fully answer the question, say what's missing r
     
     llm = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", temperature=0)
     response = llm.invoke(prompt)
-    return response.content[0]["text"]
+
+    content = response.content
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # handle the list-of-blocks case you found originally
+        for block in content:
+            if isinstance(block, dict) and "text" in block:
+                return block["text"]
+        return str(content)  # fallback if shape is unexpected
+    else:
+        return str(content)
