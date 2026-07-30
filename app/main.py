@@ -22,11 +22,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5174",
-        "https://grasp-afo3.onrender.com",
-        "https://grasp-frontend-lyart.vercel.app",
+        "http://localhost:5173",
+        "grasp-frontend-g7g13wbyf-lakshya0010s-projects.vercel.app",
     ],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
